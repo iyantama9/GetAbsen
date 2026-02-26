@@ -1,0 +1,74 @@
+const authService = require('../services/auth.service');
+const { success, error } = require('../utils/response');
+
+async function login(req, res, next) {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return error(res, 'Email and password required', 400);
+
+    const result = await authService.login(email, password);
+
+    res.cookie('accessToken', result.accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return success(res, result.user);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function logout(req, res) {
+  res.clearCookie('accessToken');
+  res.clearCookie('refreshToken');
+  return success(res, { message: 'Logged out' });
+}
+
+async function me(req, res, next) {
+  try {
+    const user = await authService.getUserById(req.user.id);
+    if (!user) return error(res, 'User not found', 404);
+    return success(res, user);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function refresh(req, res, next) {
+  try {
+    const jwt = require('jsonwebtoken');
+    const config = require('../config/env');
+    const token = req.cookies?.refreshToken;
+    if (!token) return error(res, 'Refresh token required', 401);
+
+    const decoded = jwt.verify(token, config.jwt.secret);
+    const user = await authService.getUserById(decoded.id);
+    if (!user) return error(res, 'User not found', 404);
+
+    const payload = { id: user.id, name: user.name, email: user.email, role: user.role };
+    const accessToken = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
+
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 15 * 60 * 1000,
+    });
+
+    return success(res, payload);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, logout, me, refresh };
