@@ -20,7 +20,7 @@ async function login(email, password) {
 async function getUserById(id) {
   return prisma.user.findUnique({
     where: { id },
-    select: { id: true, name: true, email: true, role: true, department: true, mentorId: true, createdAt: true },
+    select: { id: true, name: true, email: true, role: true, department: true, avatarUrl: true, mentorId: true, createdAt: true },
   });
 }
 

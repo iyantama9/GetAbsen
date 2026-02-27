@@ -37,4 +37,10 @@ module.exports = {
     latitude: parseFloat(process.env.OFFICE_LATITUDE || '-6.2088'),
     longitude: parseFloat(process.env.OFFICE_LONGITUDE || '106.8456'),
   },
+
+  ai: {
+    apiKey: process.env.AI_API_KEY,
+    baseUrl: process.env.AI_BASE_URL || 'https://router.getcore.id/v1',
+    model: process.env.AI_MODEL || 'gemini-2.5-flash',
+  },
 };

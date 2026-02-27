@@ -34,17 +34,20 @@ async function updateSettings(req, res, next) {
 
 async function aiQuery(req, res, next) {
   try {
-    const { query } = req.body;
+    const { query, messages: history } = req.body;
     if (!query) return error(res, 'Query required', 400);
 
-    // Placeholder response — AI engineer will replace this handler
-    return success(res, {
-      query,
-      response: `[AI Placeholder] Received query: "${query}". This endpoint is a placeholder for the AI assistant. The AI engineer will integrate the actual model here.`,
-      timestamp: new Date().toISOString(),
-      note: 'This is a mock response. Replace ai.service.js handler with actual AI integration.',
-    });
+    const aiService = require('../services/ai.service');
+
+    // Build conversation with history if provided
+    const messages = history && history.length > 0
+      ? [...history, { role: 'user', content: query }]
+      : [{ role: 'user', content: query }];
+
+    const response = await aiService.chat(messages);
+    return success(res, { response });
   } catch (err) {
+    if (err.statusCode) return error(res, err.message, err.statusCode);
     next(err);
   }
 }

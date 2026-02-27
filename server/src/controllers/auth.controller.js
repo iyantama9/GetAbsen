@@ -71,4 +71,29 @@ async function refresh(req, res, next) {
   }
 }
 
-module.exports = { login, logout, me, refresh };
+async function updateProfile(req, res, next) {
+  try {
+    const { prisma } = require('../middleware/auth');
+    const data = {};
+    if (req.body.name) data.name = req.body.name;
+    if (req.body.department !== undefined) data.department = req.body.department;
+
+    // Handle avatar upload
+    if (req.file) {
+      const r2Service = require('../services/r2.service');
+      const url = await r2Service.uploadFile(req.file, 'avatars');
+      if (url) data.avatarUrl = url;
+    }
+
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data,
+      select: { id: true, name: true, email: true, role: true, department: true, avatarUrl: true },
+    });
+    return success(res, user);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, logout, me, refresh, updateProfile };
