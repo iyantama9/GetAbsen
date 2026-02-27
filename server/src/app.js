@@ -12,6 +12,7 @@ const logbookRoutes = require('./routes/logbook.routes');
 const plannerRoutes = require('./routes/planner.routes');
 const usersRoutes = require('./routes/users.routes');
 const adminRoutes = require('./routes/admin.routes');
+const googleRoutes = require('./routes/google.routes');
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use('/api/logbook', logbookRoutes);
 app.use('/api/planner', plannerRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/google', googleRoutes);
 
 // Error handler
 app.use(errorHandler);

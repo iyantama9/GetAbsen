@@ -1,9 +1,21 @@
 const { prisma } = require('../middleware/auth');
+const googleService = require('./google.service');
 
 async function createEvent(userId, data) {
-  return prisma.plannerEvent.create({
+  const event = await prisma.plannerEvent.create({
     data: { userId, ...data },
   });
+
+  // Auto-sync to Google Calendar if connected
+  const gcalEventId = await googleService.syncEventToCalendar(userId, event);
+  if (gcalEventId) {
+    return prisma.plannerEvent.update({
+      where: { id: event.id },
+      data: { gcalEventId },
+    });
+  }
+
+  return event;
 }
 
 async function getEvents(userId, role, query) {
@@ -38,6 +50,12 @@ async function updateEvent(id, userId, data) {
 async function deleteEvent(id, userId) {
   const event = await prisma.plannerEvent.findUnique({ where: { id } });
   if (!event || event.userId !== userId) return null;
+
+  // Delete from Google Calendar if synced
+  if (event.gcalEventId) {
+    await googleService.deleteCalendarEvent(userId, event.gcalEventId);
+  }
+
   return prisma.plannerEvent.delete({ where: { id } });
 }
 

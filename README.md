@@ -125,4 +125,4 @@ Bagian ini merangkum panduan tentang bagaimana Model Bahasa (LLM) dan AI Agent b
 4.  **Integrasi Desain Frontend:** Saat ingin merender "AI Box Reccomendation" atau "Pesan AI Chat" di antarmuka, tetap gunakan komponen CSS *Claymorphism UI*! Gunakan `var(--shadow-clay)` yang sudah disiapkan di file `index.css` agar secara estetika tidak merusak kesan *playful* tema aplikasinya.
 
 ---
-*Dibuat oleh Tim Getcore.ID*
+*Dibuat oleh Tim Intern  Getcore.ID*

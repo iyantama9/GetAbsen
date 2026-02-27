@@ -13,8 +13,9 @@ model User {
   email        String   @unique
   passwordHash String   @map("password_hash")
   role         Role     @default(INTERN)
-  department   String?
-  mentorId     String?  @map("mentor_id")
+  department          String?
+  googleRefreshToken  String?  @map("google_refresh_token")
+  mentorId            String?  @map("mentor_id")
   mentor       User?    @relation("MentorInterns", fields: [mentorId], references: [id])
   interns      User[]   @relation("MentorInterns")
   createdAt    DateTime @default(now()) @map("created_at")

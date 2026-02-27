@@ -1,7 +1,19 @@
 import { useState, useEffect } from 'react';
-import { getPlannerEvents, createPlannerEvent, deletePlannerEvent } from '../../api/planner';
+import { useSearchParams } from 'react-router-dom';
+import { getPlannerEvents, createPlannerEvent, deletePlannerEvent, getGoogleStatus, getGoogleAuthUrl, disconnectGoogle } from '../../api/planner';
 import Modal from '../../components/Modal';
-import { Plus, Trash2, ChevronLeft, ChevronRight, CalendarDays, Clock } from 'lucide-react';
+import { Plus, Trash2, ChevronLeft, ChevronRight, CalendarDays, Clock, Link2, Unlink, CheckCircle2, ExternalLink } from 'lucide-react';
+
+function GoogleIcon({ size = 16, ...props }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} {...props}>
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
+  );
+}
 
 export default function Planner() {
   const [events, setEvents] = useState([]);
@@ -10,12 +22,44 @@ export default function Planner() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({ title: '', startDate: '', startTime: '10:00', endDate: '', endTime: '17:00', allDay: false, description: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  useEffect(() => { fetchEvents(); }, []);
+  useEffect(() => { fetchEvents(); checkGoogleStatus(); }, []);
+
+  // Handle "?google=connected" from OAuth callback
+  useEffect(() => {
+    const g = searchParams.get('google');
+    if (g === 'connected') {
+      setGoogleConnected(true);
+      setSearchParams({}, { replace: true });
+    } else if (g === 'error') {
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
 
   const fetchEvents = async () => {
     try { const res = await getPlannerEvents(); setEvents(res.data.data); }
     catch {} finally { setLoading(false); }
+  };
+
+  const checkGoogleStatus = async () => {
+    try { const res = await getGoogleStatus(); setGoogleConnected(res.data.data.connected); }
+    catch { setGoogleConnected(false); }
+  };
+
+  const handleGoogleConnect = async () => {
+    setGoogleLoading(true);
+    try {
+      const res = await getGoogleAuthUrl();
+      window.location.href = res.data.data.url;
+    } catch (err) { console.error(err); setGoogleLoading(false); }
+  };
+
+  const handleGoogleDisconnect = async () => {
+    if (!confirm('Disconnect Google Calendar? Event yang sudah disync tidak terhapus.')) return;
+    try { await disconnectGoogle(); setGoogleConnected(false); } catch {}
   };
 
   const openNewEvent = () => {
@@ -66,7 +110,22 @@ export default function Planner() {
           <h1 className="page-title">Planner</h1>
           <p className="page-subtitle">Atur jadwal dan kegiatan kamu</p>
         </div>
-        <button onClick={openNewEvent} className="btn btn-primary"><Plus size={16} /> Add Event</button>
+        <div className="flex items-center gap-2">
+          {googleConnected ? (
+            <button onClick={handleGoogleDisconnect} className="btn btn-secondary text-xs gap-1.5 group" title="Disconnect Google Calendar">
+              <GoogleIcon size={14} />
+              <span className="hidden sm:inline">Google Calendar</span>
+              <CheckCircle2 size={13} style={{ color: 'var(--color-success)' }} />
+            </button>
+          ) : (
+            <button onClick={handleGoogleConnect} disabled={googleLoading} className="btn btn-secondary text-xs gap-1.5" title="Connect Google Calendar">
+              <GoogleIcon size={14} />
+              <span className="hidden sm:inline">{googleLoading ? 'Connecting...' : 'Connect Calendar'}</span>
+              <Link2 size={13} />
+            </button>
+          )}
+          <button onClick={openNewEvent} className="btn btn-primary"><Plus size={16} /> <span className="hidden sm:inline">Add Event</span></button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -119,7 +178,14 @@ export default function Planner() {
                 <div key={event.id} className="card animate-fade-in-up group hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h4 className="font-semibold text-sm truncate" style={{ color: 'var(--color-text)' }}>{event.title}</h4>
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="font-semibold text-sm truncate" style={{ color: 'var(--color-text)' }}>{event.title}</h4>
+                        {event.gcalEventId && (
+                          <span title="Synced to Google Calendar" className="flex-shrink-0">
+                            <GoogleIcon size={12} />
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs mt-0.5 flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
                         <Clock size={11} />
                         {event.allDay ? 'Seharian' : `${new Date(event.startDate).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.endDate).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`}
@@ -151,6 +217,12 @@ export default function Planner() {
             <span className="text-sm" style={{ color: 'var(--color-text)' }}>All Day</span>
           </label>
           <div><label className="label">Detail</label><textarea value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Deskripsi event..." className="input min-h-[72px] resize-none" rows={3} /></div>
+          {googleConnected && (
+            <div className="flex items-center gap-2 p-2.5 rounded-lg text-xs" style={{ background: 'rgba(16,185,129,0.08)', color: '#059669' }}>
+              <GoogleIcon size={14} />
+              <span>Event akan otomatis sync ke Google Calendar</span>
+            </div>
+          )}
           <button onClick={handleCreate} disabled={submitting || !form.title} className="btn btn-primary w-full py-2.5">
             {submitting ? <span className="spinner" style={{ width: '1rem', height: '1rem', borderWidth: '2px', borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'white' }} /> : 'Create Event'}
           </button>
