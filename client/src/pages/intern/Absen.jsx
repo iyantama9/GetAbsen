@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAttendances, submitAttendance } from '../../api/attendance';
 import useGeolocation from '../../hooks/useGeolocation';
+import api from '../../api/client';
 import Modal from '../../components/Modal';
 import FileUpload from '../../components/FileUpload';
-import { MapPin, Check, FileText, Thermometer, Paperclip, Clock, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { MapPin, Check, FileText, Thermometer, Paperclip, Clock, ChevronLeft, ChevronRight, AlertTriangle, Unlock } from 'lucide-react';
 
 export default function Absen() {
   const [attendances, setAttendances] = useState([]);
@@ -16,8 +17,13 @@ export default function Absen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [pageOffset, setPageOffset] = useState(0);
-  const [viewMode, setViewMode] = useState(false); // true = viewing existing attendance (non-today)
+  const [viewMode, setViewMode] = useState(false);
+  const [reopenedDates, setReopenedDates] = useState([]);
   const { location, error: geoError, loading: geoLoading, requestLocation } = useGeolocation();
+
+  useEffect(() => {
+    api.get('/admin/attendance/reopened').then(res => setReopenedDates(res.data.data)).catch(() => {});
+  }, []);
 
   const getWorkingDays = useCallback((offset = 0) => {
     const days = [];
@@ -66,10 +72,13 @@ export default function Absen() {
     return attendances.find(a => a.date?.split('T')[0] === dateStr);
   };
 
+  const isReopened = (date) => reopenedDates.includes(date.toISOString().split('T')[0]);
+
   const openModal = (date) => {
     const att = getAttendanceForDate(date);
     const today = isToday(date);
     const past = isPast(date) && !today;
+    const reopened = isReopened(date);
 
     // If already has attendance, open in view mode
     if (att) {
@@ -79,7 +88,16 @@ export default function Absen() {
       return;
     }
 
-    // If past and no attendance, show warning (can't submit)
+    // If past and reopened — allow submission
+    if (past && reopened) {
+      setSelectedDate(date);
+      setViewMode(false);
+      setStatus('HADIR'); setReason(''); setEvidence(null); setError('');
+      setModalOpen(true);
+      return;
+    }
+
+    // If past and not reopened — show warning
     if (past) {
       setSelectedDate(date);
       setViewMode(true);
@@ -190,6 +208,12 @@ export default function Absen() {
               ) : today ? (
                 <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--color-border-light)' }}>
                   <span className="text-xs font-medium" style={{ color: 'var(--color-primary)' }}>Tap untuk absen →</span>
+                </div>
+              ) : past && isReopened(date) ? (
+                <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--color-border-light)' }}>
+                  <span className="text-xs font-medium flex items-center gap-1" style={{ color: '#059669' }}>
+                    <Unlock size={11} /> Dibuka kembali
+                  </span>
                 </div>
               ) : past ? (
                 <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--color-border-light)' }}>

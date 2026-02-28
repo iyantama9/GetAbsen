@@ -12,22 +12,27 @@ async function submit(req, res, next) {
       return error(res, 'Geolocation required for HADIR status', 400);
     }
 
-    // Feature 2: Validate date must be today
+    // Feature 2: Validate date must be today (unless reopened by admin)
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     if (date !== todayStr) {
-      return error(res, 'Absen hanya bisa dilakukan pada hari ini', 400);
+      const reopened = await prisma.appSetting.findUnique({ where: { key: `reopen_${date}` } });
+      if (!reopened) {
+        return error(res, 'Absen hanya bisa dilakukan pada hari ini', 400);
+      }
     }
 
-    // Feature 2: Validate within attendance time window
-    const endTimeSetting = await prisma.appSetting.findUnique({ where: { key: 'absen_end_time' } });
-    const endTimeStr = endTimeSetting?.value || '17:00';
-    const [endH, endM] = endTimeStr.split(':').map(Number);
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const endMinutes = endH * 60 + endM;
-    if (currentMinutes > endMinutes) {
-      return error(res, `Absen sudah terlewat. Batas absen hari ini pukul ${endTimeStr} WIB`, 400);
+    // Feature 2: Validate within attendance time window (only for today)
+    if (date === todayStr) {
+      const endTimeSetting = await prisma.appSetting.findUnique({ where: { key: 'absen_end_time' } });
+      const endTimeStr = endTimeSetting?.value || '17:00';
+      const [endH, endM] = endTimeStr.split(':').map(Number);
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const endMinutes = endH * 60 + endM;
+      if (currentMinutes > endMinutes) {
+        return error(res, `Absen sudah terlewat. Batas absen hari ini pukul ${endTimeStr} WIB`, 400);
+      }
     }
 
     // Feature 3: Evidence mandatory
@@ -39,6 +44,10 @@ async function submit(req, res, next) {
 
     const fileUrl = await r2Service.uploadFile(req.file, 'attendance');
     await attendanceService.addEvidence(attendance.id, fileUrl, req.file.mimetype);
+
+    // Sync to Notion (non-blocking, per-user token)
+    const notionService = require('../services/notion.service');
+    notionService.syncAttendanceToNotion(req.user.id, attendance, req.user.name).catch(() => {});
 
     const updated = await attendanceService.getAttendanceById(attendance.id);
     return success(res, updated, 201);

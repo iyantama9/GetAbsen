@@ -1,113 +1,251 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import api from '../../api/client';
-import { Send, Bot, Sparkles, Trash2 } from 'lucide-react';
+import { Send, Bot, Sparkles, Trash2, Plus, MessageSquare, Pencil, Check, X } from 'lucide-react';
+
+// ── Markdown Renderer ──
+
+function renderMarkdown(text) {
+  if (!text) return null;
+  const lines = text.split('\n');
+  const elements = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.startsWith('### ')) { elements.push(<h4 key={i} className="font-bold text-sm mt-2 mb-1">{renderInline(line.slice(4))}</h4>); i++; continue; }
+    if (line.startsWith('## ')) { elements.push(<h3 key={i} className="font-bold text-base mt-2 mb-1">{renderInline(line.slice(3))}</h3>); i++; continue; }
+    if (/^\d+\.\s/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\d+\.\s/.test(lines[i])) { items.push(lines[i].replace(/^\d+\.\s/, '')); i++; }
+      elements.push(<ol key={`ol-${i}`} className="list-decimal list-inside space-y-0.5 my-1 text-sm">{items.map((item, j) => <li key={j}>{renderInline(item)}</li>)}</ol>);
+      continue;
+    }
+    if (/^[\-\*]\s/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^[\-\*]\s/.test(lines[i])) { items.push(lines[i].replace(/^[\-\*]\s/, '')); i++; }
+      elements.push(<ul key={`ul-${i}`} className="list-disc list-inside space-y-0.5 my-1 text-sm">{items.map((item, j) => <li key={j}>{renderInline(item)}</li>)}</ul>);
+      continue;
+    }
+    if (/^\s+[\-\*]\s/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\s+[\-\*]\s/.test(lines[i])) { items.push(lines[i].replace(/^\s+[\-\*]\s/, '')); i++; }
+      elements.push(<ul key={`sul-${i}`} className="list-disc list-inside space-y-0.5 my-0.5 ml-4 text-sm">{items.map((item, j) => <li key={j}>{renderInline(item)}</li>)}</ul>);
+      continue;
+    }
+    if (line.trim() === '') { i++; continue; }
+    elements.push(<p key={i} className="text-sm my-0.5">{renderInline(line)}</p>);
+    i++;
+  }
+  return elements;
+}
+
+function renderInline(text) {
+  return text.split(/(\*\*.*?\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : part
+  );
+}
+
+// ── Room Sidebar ──
+
+function RoomSidebar({ rooms, activeRoom, onSelect, onCreate, onRename, onDelete }) {
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState('');
+  const inputRef = useRef(null);
+
+  useEffect(() => { if (editingId && inputRef.current) inputRef.current.focus(); }, [editingId]);
+
+  const startEdit = (room) => { setEditingId(room.id); setEditName(room.name); };
+  const confirmEdit = () => { if (editName.trim()) { onRename(editingId, editName.trim()); } setEditingId(null); };
+
+  return (
+    <div className="flex flex-col h-full border-r" style={{ borderColor: 'var(--color-border)', width: '240px', minWidth: '240px', background: 'var(--color-surface-alt)' }}>
+      <div className="p-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--color-border)' }}>
+        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Rooms</span>
+        <button onClick={onCreate} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-purple-500/10 transition-colors cursor-pointer" style={{ color: 'var(--color-primary)' }}>
+          <Plus size={16} />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+        {rooms.map(room => (
+          <div key={room.id}
+            className={`group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all text-sm ${activeRoom === room.id ? 'font-medium' : ''}`}
+            style={activeRoom === room.id ? { background: 'var(--color-primary-100)', color: 'var(--color-primary)' } : { color: 'var(--color-text-secondary)' }}
+            onClick={() => onSelect(room.id)}
+          >
+            <MessageSquare size={14} className="flex-shrink-0" />
+            {editingId === room.id ? (
+              <div className="flex items-center gap-1 flex-1 min-w-0">
+                <input ref={inputRef} value={editName} onChange={e => setEditName(e.target.value)} onKeyDown={e => e.key === 'Enter' && confirmEdit()}
+                  className="flex-1 min-w-0 bg-transparent border-b text-sm px-0 py-0 outline-none" style={{ borderColor: 'var(--color-primary)', color: 'var(--color-text)' }}
+                  onClick={e => e.stopPropagation()} />
+                <button onClick={(e) => { e.stopPropagation(); confirmEdit(); }} className="cursor-pointer"><Check size={12} /></button>
+                <button onClick={(e) => { e.stopPropagation(); setEditingId(null); }} className="cursor-pointer"><X size={12} /></button>
+              </div>
+            ) : (
+              <>
+                <span className="flex-1 truncate">{room.name}</span>
+                <div className="hidden group-hover:flex items-center gap-1">
+                  <button onClick={(e) => { e.stopPropagation(); startEdit(room); }} className="cursor-pointer opacity-60 hover:opacity-100"><Pencil size={11} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); onDelete(room.id); }} className="cursor-pointer opacity-60 hover:opacity-100 text-red-400"><Trash2 size={11} /></button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+        {rooms.length === 0 && <p className="text-xs p-3 text-center" style={{ color: 'var(--color-text-muted)' }}>Belum ada chat room</p>}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ──
 
 export default function AiChat() {
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Halo! Saya AI Assistant GetAbsen, powered by **Gemini Flash** ⚡\n\nSaya bisa membantu kamu memantau progress intern, menganalisis data absensi, dan memberikan insight. Tanya apa saja!' },
-  ]);
+  const [rooms, setRooms] = useState([]);
+  const [activeRoom, setActiveRoom] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [roomsLoaded, setRoomsLoaded] = useState(false);
   const bottomRef = useRef(null);
 
+  const greeting = { role: 'assistant', content: 'Halo! Saya **AI Assistant GetAbsen**, powered by **Gemini Flash** ⚡\n\nSaya bisa membantu kamu:\n- Memantau **progress intern**\n- Menganalisis **data absensi**\n- Memberikan **insight dan saran**\n\nTanya apa saja!' };
+
+  useEffect(() => { loadRooms(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  const loadRooms = async () => {
+    try {
+      const res = await api.get('/admin/mentor/chat-rooms');
+      const data = res.data.data;
+      setRooms(data);
+      if (data.length > 0 && !activeRoom) setActiveRoom(data[0].id);
+    } catch {} finally { setRoomsLoaded(true); }
+  };
+
+  const loadMessages = useCallback(async (roomId) => {
+    if (!roomId) { setMessages([greeting]); return; }
+    try {
+      const res = await api.get(`/admin/mentor/chat-rooms/${roomId}/messages`);
+      const data = res.data.data;
+      setMessages(data.length > 0 ? data.map(m => ({ role: m.role, content: m.content })) : [greeting]);
+    } catch { setMessages([greeting]); }
+  }, []);
+
+  useEffect(() => { if (activeRoom) loadMessages(activeRoom); else setMessages([greeting]); }, [activeRoom, loadMessages]);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
     const userMsg = input.trim();
     setInput('');
-    const newMessages = [...messages, { role: 'user', content: userMsg }];
-    setMessages(newMessages);
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setLoading(true);
     try {
-      // Send conversation history (exclude first greeting)
-      const history = newMessages.slice(1).map(m => ({ role: m.role, content: m.content }));
-      const res = await api.post('/admin/mentor/ai-query', { query: userMsg, messages: history.slice(0, -1) });
+      const res = await api.post('/admin/mentor/ai-query', { query: userMsg, roomId: activeRoom });
       setMessages(prev => [...prev, { role: 'assistant', content: res.data.data.response }]);
+      // If a new room was created by the backend, set it
+      if (res.data.data.roomId && !activeRoom) {
+        setActiveRoom(res.data.data.roomId);
+        loadRooms();
+      }
     } catch (err) {
-      const errMsg = err.response?.status === 501
-        ? 'API key belum dikonfigurasi. Hubungi admin.'
-        : err.response?.status === 502
-        ? 'Gagal menghubungi AI API. Coba lagi nanti.'
-        : 'Terjadi error. Silakan coba lagi.';
+      const errMsg = err.response?.status === 502 ? 'Gagal menghubungi AI API. Coba lagi nanti.' : 'Terjadi error. Silakan coba lagi.';
       setMessages(prev => [...prev, { role: 'assistant', content: errMsg }]);
     } finally { setLoading(false); }
   };
 
   const handleKeyDown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } };
-  const clearChat = () => setMessages([messages[0]]);
 
-  // Simple markdown-ish rendering for bold
-  const renderContent = (text) => {
-    return text.split(/(\*\*.*?\*\*)/g).map((part, i) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i}>{part.slice(2, -2)}</strong>;
-      }
-      return part;
-    });
+  const createRoom = async () => {
+    try {
+      const res = await api.post('/admin/mentor/chat-rooms', { name: 'Chat Baru' });
+      await loadRooms();
+      setActiveRoom(res.data.data.id);
+    } catch {}
   };
 
-  return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] lg:h-[calc(100vh-4rem)] animate-fade-in-up">
-      <div className="page-header flex-shrink-0 flex items-start justify-between">
-        <div>
-          <h1 className="page-title flex items-center gap-2">
-            <Bot size={20} style={{ color: 'var(--color-primary)' }} />
-            AI Assistant
-          </h1>
-          <p className="page-subtitle flex items-center gap-2 mt-1">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-full font-bold tracking-wide" style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>
-              <Sparkles size={10} /> GEMINI FLASH
-            </span>
-            Powered by Getcore.ID
-          </p>
-        </div>
-        {messages.length > 1 && (
-          <button onClick={clearChat} className="btn btn-ghost text-xs gap-1 cursor-pointer" style={{ color: 'var(--color-text-muted)' }}>
-            <Trash2 size={13} /> Clear
-          </button>
-        )}
-      </div>
+  const renameRoom = async (id, name) => {
+    try {
+      await api.put(`/admin/mentor/chat-rooms/${id}`, { name });
+      loadRooms();
+    } catch {}
+  };
 
-      <div className="flex-1 overflow-y-auto space-y-3 mb-4 pr-1">
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
-            {msg.role === 'assistant' && (
+  const deleteRoom = async (id) => {
+    try {
+      await api.delete(`/admin/mentor/chat-rooms/${id}`);
+      const updated = rooms.filter(r => r.id !== id);
+      setRooms(updated);
+      if (activeRoom === id) setActiveRoom(updated[0]?.id || null);
+    } catch {}
+  };
+
+  if (!roomsLoaded) return <div className="flex items-center justify-center h-64"><div className="spinner" /></div>;
+
+  return (
+    <div className="flex h-[calc(100vh-5rem)] lg:h-[calc(100vh-4rem)] animate-fade-in-up rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+      {/* Room sidebar */}
+      <RoomSidebar rooms={rooms} activeRoom={activeRoom} onSelect={setActiveRoom} onCreate={createRoom} onRename={renameRoom} onDelete={deleteRoom} />
+
+      {/* Chat area */}
+      <div className="flex flex-col flex-1 min-w-0" style={{ background: 'var(--color-bg)' }}>
+        {/* Header */}
+        <div className="flex-shrink-0 px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--color-border)' }}>
+          <div>
+            <h1 className="text-base font-bold flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
+              <Bot size={18} style={{ color: 'var(--color-primary)' }} />
+              AI Assistant
+            </h1>
+            <p className="flex items-center gap-2 mt-0.5">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-full font-bold tracking-wide" style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>
+                <Sparkles size={10} /> GEMINI FLASH
+              </span>
+              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Powered by Getcore.ID</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto space-y-3 p-4">
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
+              {msg.role === 'assistant' && (
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mr-2 mt-0.5" style={{ background: 'var(--color-primary-100)' }}>
+                  <Bot size={14} style={{ color: 'var(--color-primary)' }} />
+                </div>
+              )}
+              <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 leading-relaxed"
+                style={msg.role === 'user'
+                  ? { background: 'var(--color-primary)', color: 'white', borderBottomRightRadius: '0.375rem', fontSize: '0.875rem' }
+                  : { background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', borderBottomLeftRadius: '0.375rem' }
+                }
+              >
+                {msg.role === 'user' ? msg.content : renderMarkdown(msg.content)}
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex justify-start animate-fade-in">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mr-2" style={{ background: 'var(--color-primary-100)' }}>
                 <Bot size={14} style={{ color: 'var(--color-primary)' }} />
               </div>
-            )}
-            <div className="max-w-[80%] sm:max-w-[70%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap"
-              style={msg.role === 'user'
-                ? { background: 'var(--color-primary)', color: 'white', borderBottomRightRadius: '0.375rem' }
-                : { background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', borderBottomLeftRadius: '0.375rem' }
-              }
-            >
-              {renderContent(msg.content)}
-            </div>
-          </div>
-        ))}
-        {loading && (
-          <div className="flex justify-start animate-fade-in">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mr-2" style={{ background: 'var(--color-primary-100)' }}>
-              <Bot size={14} style={{ color: 'var(--color-primary)' }} />
-            </div>
-            <div className="rounded-2xl px-4 py-3" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderBottomLeftRadius: '0.375rem' }}>
-              <div className="flex gap-1">
-                {[0, 150, 300].map(d => <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: 'var(--color-text-muted)', animationDelay: `${d}ms` }} />)}
+              <div className="rounded-2xl px-4 py-3" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderBottomLeftRadius: '0.375rem' }}>
+                <div className="flex gap-1">
+                  {[0, 150, 300].map(d => <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: 'var(--color-text-muted)', animationDelay: `${d}ms` }} />)}
+                </div>
               </div>
             </div>
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
 
-      <div className="flex-shrink-0 flex gap-2 sm:gap-3">
-        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Tanya tentang progress intern..." className="input flex-1" disabled={loading} />
-        <button onClick={handleSend} disabled={loading || !input.trim()} className="btn btn-primary px-3 sm:px-5 cursor-pointer">
-          <Send size={16} />
-          <span className="hidden sm:inline">Send</span>
-        </button>
+        {/* Input */}
+        <div className="flex-shrink-0 px-4 pb-4 flex gap-2 sm:gap-3">
+          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Tanya tentang progress intern..." className="input flex-1" disabled={loading} />
+          <button onClick={handleSend} disabled={loading || !input.trim()} className="btn btn-primary px-3 sm:px-5 cursor-pointer">
+            <Send size={16} />
+            <span className="hidden sm:inline">Send</span>
+          </button>
+        </div>
       </div>
     </div>
   );

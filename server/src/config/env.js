@@ -23,8 +23,9 @@ module.exports = {
   },
 
   notion: {
-    apiKey: process.env.NOTION_API_KEY,
-    databaseId: process.env.NOTION_DATABASE_ID,
+    clientId: process.env.NOTION_CLIENT_ID,
+    clientSecret: process.env.NOTION_CLIENT_SECRET,
+    redirectUri: process.env.NOTION_REDIRECT_URI || 'http://localhost:3000/api/auth/notion/callback',
   },
 
   google: {
