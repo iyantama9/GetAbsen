@@ -3,18 +3,20 @@ const jwt = require('jsonwebtoken');
 const config = require('../config/env');
 const { prisma } = require('../middleware/auth');
 
-async function login(email, password) {
+async function login(email, password, rememberMe = false) {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
 
-  const payload = { id: user.id, name: user.name, email: user.email, role: user.role };
-  const accessToken = jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
-  const refreshToken = jwt.sign({ id: user.id }, config.jwt.secret, { expiresIn: config.jwt.refreshExpiresIn });
+  const payload = { id: user.id, name: user.name, email: user.email, role: user.role, department: user.department, avatarUrl: user.avatarUrl };
+  const accessExpiry = rememberMe ? '30d' : config.jwt.expiresIn;
+  const refreshExpiry = rememberMe ? '90d' : config.jwt.refreshExpiresIn;
+  const accessToken = jwt.sign({ id: user.id, role: user.role }, config.jwt.secret, { expiresIn: accessExpiry });
+  const refreshToken = jwt.sign({ id: user.id }, config.jwt.secret, { expiresIn: refreshExpiry });
 
-  return { accessToken, refreshToken, user: payload };
+  return { accessToken, refreshToken, user: payload, rememberMe };
 }
 
 async function getUserById(id) {

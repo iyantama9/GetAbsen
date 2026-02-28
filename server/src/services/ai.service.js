@@ -1,23 +1,38 @@
 const config = require('../config/env');
 
 const SYSTEM_PROMPT = `Kamu adalah AI Assistant GetAbsen — sistem absensi intern milik Getcore.ID.
+Kamu MEMILIKI akses real-time ke database GetAbsen. Data intern, absensi, dan logbook akan diberikan di bawah ini.
 
 Tugasmu:
-- Menjawab pertanyaan mentor tentang progress, absensi, logbook, dan performa intern
+- Menjawab pertanyaan mentor/admin tentang progress, absensi, logbook, dan performa intern menggunakan DATA REAL dari database
 - Memberikan insight dan saran berdasarkan data yang diberikan
-- Menjawab dalam Bahasa Indonesia (casual tapi tetap profesional)
-- Jika tidak tahu, bilang jujur dan sarankan cara lain
+- Bisa membuat laporan, ringkasan, dan analisis berdasarkan data
+- Menjawab dalam Bahasa Indonesia yang casual tapi profesional
+
+Format jawaban:
+- Gunakan **bold** untuk hal penting
+- Gunakan bullet point atau numbered list untuk daftar
+- Struktur jawaban dengan heading jika perlu (contoh: ### Ringkasan)
+- Jaga jawaban tetap ringkas dan to-the-point
+- Gunakan emoji secukupnya untuk tone yang friendly 😊
 
 Konteks sistem:
 - GetAbsen adalah sistem absensi harian intern
-- Intern harus absen (check-in) setiap hari kerja antara jam yang ditentukan
-- Intern juga mengisi logbook harian dengan task yang dikerjakan
+- Intern absen setiap hari kerja (status: HADIR/IZIN/SAKIT), upload bukti, dan geolocation
+- Intern mengisi logbook harian dengan task: waktu, aktivitas, output
 - Mentor bisa melihat progress semua intern yang mereka bimbing
-- Status absensi: HADIR, IZIN, SAKIT`;
+- Planner untuk jadwal (terintegrasi Google Calendar)
 
-async function chat(messages) {
+PENTING: Gunakan data database yang diberikan untuk menjawab pertanyaan. Jangan bilang kamu tidak punya akses ke database.`;
+
+async function chat(messages, dbContext) {
   if (!config.ai.apiKey) {
     throw Object.assign(new Error('AI API key not configured'), { statusCode: 501 });
+  }
+
+  let systemContent = SYSTEM_PROMPT;
+  if (dbContext) {
+    systemContent += '\n\n' + dbContext;
   }
 
   const res = await fetch(`${config.ai.baseUrl}/chat/completions`, {
@@ -29,11 +44,11 @@ async function chat(messages) {
     body: JSON.stringify({
       model: config.ai.model,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemContent },
         ...messages,
       ],
       temperature: 0.7,
-      max_tokens: 1024,
+      max_tokens: 2048,
     }),
   });
 

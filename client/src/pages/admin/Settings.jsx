@@ -1,19 +1,44 @@
 import { useState, useEffect } from 'react';
 import api from '../../api/client';
-import { Save, Clock as ClockIcon, MapPin, Link2, Cloud, BookOpen, CalendarDays, CheckCircle2 } from 'lucide-react';
+import { Save, Clock as ClockIcon, MapPin, Link2, Cloud, BookOpen, CalendarDays, CheckCircle2, Unplug, Plug } from 'lucide-react';
 
 export default function Settings() {
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [notionStatus, setNotionStatus] = useState({ connected: false, hasDatabaseId: false });
+  const [notionLoading, setNotionLoading] = useState(false);
 
-  useEffect(() => { fetchSettings(); }, []);
+  useEffect(() => {
+    fetchSettings();
+    fetchNotionStatus();
+
+    // Check for Notion callback result in URL
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('notion') === 'success') {
+      setMessage('notion_connected');
+      setTimeout(() => setMessage(''), 4000);
+      window.history.replaceState({}, '', window.location.pathname);
+      fetchNotionStatus();
+    } else if (params.get('notion') === 'error') {
+      setMessage('notion_error');
+      setTimeout(() => setMessage(''), 4000);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const fetchSettings = async () => {
     try { const res = await api.get('/admin/settings'); setSettings(res.data.data); }
     catch (err) { console.error(err); }
     finally { setLoading(false); }
+  };
+
+  const fetchNotionStatus = async () => {
+    try {
+      const res = await api.get('/auth/notion/status');
+      setNotionStatus(res.data.data);
+    } catch {}
   };
 
   const handleSave = async () => {
@@ -23,15 +48,32 @@ export default function Settings() {
     finally { setSaving(false); }
   };
 
+  const connectNotion = async () => {
+    setNotionLoading(true);
+    try {
+      const res = await api.get('/auth/notion');
+      const url = res.data.data.url;
+      window.location.href = url;
+    } catch (err) {
+      console.error(err);
+      setMessage('notion_error');
+      setTimeout(() => setMessage(''), 3000);
+      setNotionLoading(false);
+    }
+  };
+
+  const disconnectNotion = async () => {
+    setNotionLoading(true);
+    try {
+      await api.delete('/auth/notion/disconnect');
+      setNotionStatus({ connected: false, hasDatabaseId: false });
+    } catch (err) { console.error(err); }
+    finally { setNotionLoading(false); }
+  };
+
   const updateSetting = (key, value) => setSettings(prev => ({ ...prev, [key]: value }));
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="spinner" /></div>;
-
-  const integrations = [
-    { Icon: BookOpen, name: 'Notion API', desc: 'Sync absensi ke Notion database', status: 'Via .env' },
-    { Icon: CalendarDays, name: 'Google Calendar', desc: 'Sync planner ke Google Calendar', status: 'Via .env' },
-    { Icon: Cloud, name: 'Cloudflare R2', desc: 'Evidence file storage', status: 'Via .env' },
-  ];
 
   return (
     <div className="animate-fade-in-up">
@@ -50,6 +92,16 @@ export default function Settings() {
       {message === 'error' && (
         <div className="mb-5 p-3 rounded-xl text-sm flex items-center gap-2 animate-fade-in-up" style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--color-danger)' }}>
           Gagal menyimpan settings
+        </div>
+      )}
+      {message === 'notion_connected' && (
+        <div className="mb-5 p-3 rounded-xl text-sm flex items-center gap-2 animate-fade-in-up" style={{ background: 'rgba(16,185,129,0.08)', color: '#059669' }}>
+          <CheckCircle2 size={16} /> Notion berhasil terhubung!
+        </div>
+      )}
+      {message === 'notion_error' && (
+        <div className="mb-5 p-3 rounded-xl text-sm flex items-center gap-2 animate-fade-in-up" style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--color-danger)' }}>
+          Gagal menghubungkan Notion. Coba lagi.
         </div>
       )}
 
@@ -101,18 +153,52 @@ export default function Settings() {
           <h2 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>Integrations</h2>
         </div>
         <div className="space-y-2">
-          {integrations.map(({ Icon, name, desc, status }) => (
-            <div key={name} className="flex items-center justify-between p-3 rounded-xl transition-all hover:bg-gray-50 cursor-default" style={{ background: 'var(--color-bg)' }}>
-              <div className="flex items-center gap-3 min-w-0">
-                <Icon size={18} style={{ color: 'var(--color-text-muted)' }} className="flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text)' }}>{name}</p>
-                  <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>{desc}</p>
-                </div>
+          {/* Notion — OAuth Connect */}
+          <div className="flex items-center justify-between p-3 rounded-xl transition-all" style={{ background: 'var(--color-bg)' }}>
+            <div className="flex items-center gap-3 min-w-0">
+              <BookOpen size={18} style={{ color: 'var(--color-text-muted)' }} className="flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text)' }}>Notion</p>
+                <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>Sync absensi ke Notion database</p>
               </div>
-              <span className="badge flex-shrink-0" style={{ background: 'rgba(245,158,11,0.1)', color: '#D97706' }}>{status}</span>
             </div>
-          ))}
+            {notionStatus.connected ? (
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="badge" style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>Terhubung</span>
+                <button onClick={disconnectNotion} disabled={notionLoading} className="btn text-xs px-2 py-1" style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--color-danger)', border: 'none', borderRadius: '0.5rem' }}>
+                  <Unplug size={14} />
+                </button>
+              </div>
+            ) : (
+              <button onClick={connectNotion} disabled={notionLoading} className="btn text-xs px-3 py-1.5 flex items-center gap-1.5" style={{ background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '0.5rem' }}>
+                {notionLoading ? <span className="spinner" style={{ width: '0.75rem', height: '0.75rem', borderWidth: '2px', borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'white' }} /> : <><Plug size={14} /> Hubungkan</>}
+              </button>
+            )}
+          </div>
+
+          {/* Google Calendar — static */}
+          <div className="flex items-center justify-between p-3 rounded-xl transition-all hover:bg-gray-50 cursor-default" style={{ background: 'var(--color-bg)' }}>
+            <div className="flex items-center gap-3 min-w-0">
+              <CalendarDays size={18} style={{ color: 'var(--color-text-muted)' }} className="flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text)' }}>Google Calendar</p>
+                <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>Sync planner ke Google Calendar</p>
+              </div>
+            </div>
+            <span className="badge flex-shrink-0" style={{ background: 'rgba(245,158,11,0.1)', color: '#D97706' }}>Via .env</span>
+          </div>
+
+          {/* Cloudflare R2 — static */}
+          <div className="flex items-center justify-between p-3 rounded-xl transition-all hover:bg-gray-50 cursor-default" style={{ background: 'var(--color-bg)' }}>
+            <div className="flex items-center gap-3 min-w-0">
+              <Cloud size={18} style={{ color: 'var(--color-text-muted)' }} className="flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text)' }}>Cloudflare R2</p>
+                <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>Evidence file storage</p>
+              </div>
+            </div>
+            <span className="badge flex-shrink-0" style={{ background: 'rgba(245,158,11,0.1)', color: '#D97706' }}>Via .env</span>
+          </div>
         </div>
       </div>
     </div>

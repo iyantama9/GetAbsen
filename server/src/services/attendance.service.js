@@ -8,8 +8,10 @@ async function submitAttendance(userId, data) {
   attendanceDate.setHours(0, 0, 0, 0);
 
   let distanceKm = null;
-  if (latitude && longitude) {
-    distanceKm = calculateDistance(config.office.latitude, config.office.longitude, latitude, longitude);
+  const lat = latitude != null ? parseFloat(latitude) : null;
+  const lng = longitude != null ? parseFloat(longitude) : null;
+  if (lat && lng) {
+    distanceKm = calculateDistance(config.office.latitude, config.office.longitude, lat, lng);
   }
 
   return prisma.attendance.upsert({

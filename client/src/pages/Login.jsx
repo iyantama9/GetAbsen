@@ -6,6 +6,7 @@ import { Lock, Mail, ArrowRight } from 'lucide-react';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -16,7 +17,7 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      const user = await login(email, password);
+      const user = await login(email, password, rememberMe);
       if (user.role === 'INTERN') navigate('/absen');
       else navigate('/mentor/dashboard');
     } catch (err) {
@@ -70,6 +71,19 @@ export default function Login() {
                 <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="input pl-10" required />
               </div>
             </div>
+
+            {/* Stay Signed In */}
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-2 accent-[var(--color-primary)]"
+                style={{ accentColor: 'var(--color-primary)' }}
+              />
+              <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Tetap masuk</span>
+            </label>
+
             <button type="submit" disabled={loading} className="btn btn-primary w-full py-2.5 text-sm mt-2 group">
               {loading ? <span className="spinner" style={{ width: '1rem', height: '1rem', borderWidth: '2px', borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'white' }} />
                 : <><span>Login</span><ArrowRight size={16} className="transition-transform group-hover:translate-x-1" /></>}

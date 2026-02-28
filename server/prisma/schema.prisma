@@ -16,6 +16,8 @@ model User {
   department          String?
   avatarUrl           String?  @map("avatar_url")
   googleRefreshToken  String?  @map("google_refresh_token")
+  notionAccessToken   String?  @map("notion_access_token")
+  notionDatabaseId    String?  @map("notion_database_id")
   mentorId            String?  @map("mentor_id")
   mentor       User?    @relation("MentorInterns", fields: [mentorId], references: [id])
   interns      User[]   @relation("MentorInterns")
@@ -24,6 +26,7 @@ model User {
   attendances    Attendance[]
   logbookEntries LogbookEntry[]
   plannerEvents  PlannerEvent[]
+  chatRooms      ChatRoom[]
 
   @@map("users")
 }
@@ -135,3 +138,27 @@ model AppSetting {
 
   @@map("app_settings")
 }
+
+model ChatRoom {
+  id        String        @id @default(cuid())
+  userId    String        @map("user_id")
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String        @default("Chat Baru")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  messages  ChatMessage[]
+
+  @@map("chat_rooms")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  roomId    String   @map("room_id")
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  role      String
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("chat_messages")
+}
+
