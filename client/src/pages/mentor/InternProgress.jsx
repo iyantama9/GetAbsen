@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../api/client';
-import { Users, CalendarDays, BookOpen, ClipboardList, ChevronDown, ChevronUp, Clock, Check, FileText, Thermometer, MapPin, BarChart3, MessageSquareText, PackageCheck, ExternalLink, Search, Download } from 'lucide-react';
+import { Users, CalendarDays, BookOpen, ClipboardList, ChevronDown, ChevronUp, Clock, Check, FileText, Thermometer, MapPin, BarChart3, MessageSquareText, PackageCheck, ExternalLink, Search, Download, ScanFace, RotateCcw } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -17,6 +17,8 @@ export default function InternProgress() {
   const [plannerEvents, setPlannerEvents] = useState([]);
   const [attendances, setAttendances] = useState([]);
   const [expandedEntry, setExpandedEntry] = useState(null);
+  const [resettingFace, setResettingFace] = useState(false);
+  const [faceMsg, setFaceMsg] = useState('');
 
   useEffect(() => {
     api.get('/users', { params: { role: 'INTERN' } }).then(res => setInterns(res.data.data));
@@ -48,6 +50,22 @@ export default function InternProgress() {
   };
 
   const selectedInternName = interns.find(i => i.id === selectedIntern)?.name || '';
+
+  const handleResetFace = async () => {
+    if (!selectedIntern) return;
+    if (!window.confirm(`Reset Face ID untuk ${selectedInternName}? Intern harus mendaftar ulang wajahnya.`)) return;
+    setResettingFace(true);
+    setFaceMsg('');
+    try {
+      await api.delete(`/face/enroll/${selectedIntern}`);
+      setFaceMsg('Face ID berhasil direset');
+      setTimeout(() => setFaceMsg(''), 3000);
+    } catch (err) {
+      setFaceMsg('Gagal reset: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setResettingFace(false);
+    }
+  };
 
   const tabs = [
     { key: 'logbook', label: 'Logbook Tasks', Icon: BookOpen, count: logbookEntries.reduce((acc, e) => acc + (e.tasks?.length || 0), 0) },
@@ -119,9 +137,20 @@ export default function InternProgress() {
           <p className="page-subtitle">Lihat semua data yang di-input intern</p>
         </div>
         {selectedIntern && (
-          <button onClick={downloadInternPDF} className="btn btn-secondary">
-            <Download size={15} /> Download PDF
-          </button>
+          <div className="flex items-center gap-2">
+            {faceMsg && (
+              <span className="text-xs font-medium px-2 py-1 rounded-lg" style={{ background: faceMsg.includes('berhasil') ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', color: faceMsg.includes('berhasil') ? '#059669' : '#DC2626' }}>
+                {faceMsg}
+              </span>
+            )}
+            <button onClick={handleResetFace} disabled={resettingFace} className="btn btn-ghost flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-danger)' }}>
+              {resettingFace ? <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> : <RotateCcw size={14} />}
+              Reset Face ID
+            </button>
+            <button onClick={downloadInternPDF} className="btn btn-secondary">
+              <Download size={15} /> Download PDF
+            </button>
+          </div>
         )}
       </div>
 

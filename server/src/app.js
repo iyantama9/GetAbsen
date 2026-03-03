@@ -13,6 +13,7 @@ const plannerRoutes = require('./routes/planner.routes');
 const usersRoutes = require('./routes/users.routes');
 const adminRoutes = require('./routes/admin.routes');
 const googleRoutes = require('./routes/google.routes');
+const faceRoutes = require('./routes/face.routes');
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/planner', plannerRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/google', googleRoutes);
+app.use('/api/face', faceRoutes);
 
 // Error handler
 app.use(errorHandler);

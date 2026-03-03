@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getAttendances, submitAttendance } from '../../api/attendance';
+import { verifyFace, getFaceStatus } from '../../api/face';
 import useGeolocation from '../../hooks/useGeolocation';
 import api from '../../api/client';
 import Modal from '../../components/Modal';
 import FileUpload from '../../components/FileUpload';
-import { MapPin, Check, FileText, Thermometer, Paperclip, Clock, ChevronLeft, ChevronRight, AlertTriangle, Unlock } from 'lucide-react';
+import WebcamCapture from '../../components/WebcamCapture';
+import { MapPin, Check, FileText, Thermometer, Paperclip, Clock, ChevronLeft, ChevronRight, AlertTriangle, Unlock, ScanFace, ShieldAlert, CheckCircle2, XCircle } from 'lucide-react';
 
 export default function Absen() {
   const [attendances, setAttendances] = useState([]);
@@ -19,10 +22,19 @@ export default function Absen() {
   const [pageOffset, setPageOffset] = useState(0);
   const [viewMode, setViewMode] = useState(false);
   const [reopenedDates, setReopenedDates] = useState([]);
+  const [faceVerifyOpen, setFaceVerifyOpen] = useState(false);
+  const [faceVerifying, setFaceVerifying] = useState(false);
+  const [faceError, setFaceError] = useState('');
+  const [faceAttempts, setFaceAttempts] = useState(0);
+  const [faceBlocked, setFaceBlocked] = useState(false);
+  const [faceEnrolled, setFaceEnrolled] = useState(null);
+  const [faceResult, setFaceResult] = useState(null); // 'success' | 'fail' | null
+  const navigate = useNavigate();
   const { location, error: geoError, loading: geoLoading, requestLocation } = useGeolocation();
 
   useEffect(() => {
     api.get('/admin/attendance/reopened').then(res => setReopenedDates(res.data.data)).catch(() => {});
+    getFaceStatus().then(res => setFaceEnrolled(res.data.data?.enrolled || false)).catch(() => setFaceEnrolled(false));
   }, []);
 
   const getWorkingDays = useCallback((offset = 0) => {
@@ -56,10 +68,13 @@ export default function Absen() {
 
   const workingDays = getWorkingDays(pageOffset);
 
+  // Local timezone date formatter (avoids UTC shift from toISOString)
+  const toLocalDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
   const fetchAttendances = useCallback(async () => {
     try {
-      const startDate = workingDays[0]?.toISOString().split('T')[0];
-      const endDate = workingDays[workingDays.length - 1]?.toISOString().split('T')[0];
+      const startDate = toLocalDateStr(workingDays[0]);
+      const endDate = toLocalDateStr(workingDays[workingDays.length - 1]);
       const res = await getAttendances({ startDate, endDate });
       setAttendances(res.data.data);
     } catch {} finally { setLoading(false); }
@@ -68,11 +83,11 @@ export default function Absen() {
   useEffect(() => { setLoading(true); fetchAttendances(); }, [pageOffset]);
 
   const getAttendanceForDate = (date) => {
-    const dateStr = date.toISOString().split('T')[0];
-    return attendances.find(a => a.date?.split('T')[0] === dateStr);
+    const dateStr = toLocalDateStr(date);
+    return attendances.find(a => toLocalDateStr(new Date(a.date)) === dateStr);
   };
 
-  const isReopened = (date) => reopenedDates.includes(date.toISOString().split('T')[0]);
+  const isReopened = (date) => reopenedDates.includes(toLocalDateStr(date));
 
   const openModal = (date) => {
     const att = getAttendanceForDate(date);
@@ -119,12 +134,70 @@ export default function Absen() {
     setError('');
     if (status === 'HADIR' && !location) { setError('Klik "Ambil Lokasi" terlebih dahulu.'); return; }
     if (!evidence) { setError('Upload evidence/bukti terlebih dahulu.'); return; }
+
+    // Face verification is mandatory
+    if (faceEnrolled === false) {
+      setError('Wajah belum terdaftar. Daftarkan wajah di menu Face ID terlebih dahulu.');
+      return;
+    }
+
+    if (faceBlocked) {
+      setError('Face verification gagal 5x. Hubungi mentor untuk approval.');
+      return;
+    }
+
+    setFaceVerifyOpen(true);
+  };
+
+  const doSubmitAttendance = async () => {
     setSubmitting(true);
     try {
-      await submitAttendance({ date: selectedDate.toISOString().split('T')[0], status, latitude: location?.latitude, longitude: location?.longitude, reason, evidence });
-      setModalOpen(false); fetchAttendances();
+      await submitAttendance({ date: toLocalDateStr(selectedDate), status, latitude: location?.latitude, longitude: location?.longitude, reason, evidence });
+      await fetchAttendances();
+      setModalOpen(false); setFaceVerifyOpen(false);
+      setFaceAttempts(0);
     } catch (err) { setError(err.response?.data?.error || 'Gagal submit'); }
     finally { setSubmitting(false); }
+  };
+
+  const handleFaceVerify = async (file) => {
+    if (!file) return;
+    setFaceVerifying(true);
+    setFaceError('');
+    setFaceResult(null);
+    try {
+      const res = await verifyFace(file);
+      const data = res.data.data;
+      if (data.match) {
+        setFaceResult('success');
+        setFaceVerifying(false);
+        // Show success feedback for 2 seconds, then submit
+        await new Promise(r => setTimeout(r, 2000));
+        setFaceResult(null);
+        setFaceVerifyOpen(false);
+        await doSubmitAttendance();
+      } else {
+        const attempts = faceAttempts + 1;
+        setFaceAttempts(attempts);
+        setFaceResult('fail');
+        setFaceVerifying(false);
+        if (attempts >= 5) {
+          await new Promise(r => setTimeout(r, 2000));
+          setFaceBlocked(true);
+          setFaceVerifyOpen(false);
+          setFaceResult(null);
+          setError('Face verification gagal 5x. Hubungi mentor untuk approval.');
+        } else {
+          setFaceError(`Wajah tidak cocok (similarity: ${(data.similarity * 100).toFixed(1)}%). Kesempatan: ${5 - attempts} lagi`);
+          await new Promise(r => setTimeout(r, 2500));
+          setFaceResult(null);
+          setFaceError('');
+        }
+      }
+    } catch (err) {
+      setFaceError(err.response?.data?.error || 'Gagal verifikasi wajah');
+      setFaceVerifying(false);
+    }
   };
 
   const fmt = (date) => {
@@ -340,11 +413,61 @@ export default function Absen() {
               {!evidence && <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Upload bukti untuk mengaktifkan tombol submit</p>}
             </div>
 
-            <button onClick={handleSubmit} disabled={submitting || !evidence} className="btn btn-primary w-full py-2.5">
-              {submitting ? <span className="spinner" style={{ width: '1rem', height: '1rem', borderWidth: '2px', borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'white' }} /> : 'Submit Absensi'}
+            <button onClick={handleSubmit} disabled={submitting || !evidence || faceBlocked} className="btn btn-primary w-full py-2.5 flex items-center justify-center gap-2">
+              {submitting ? <span className="spinner" style={{ width: '1rem', height: '1rem', borderWidth: '2px', borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'white' }} /> : <><ScanFace size={18} /> Verifikasi Wajah</>}
             </button>
+            {faceEnrolled === false && (
+              <p className="text-xs text-center mt-2" style={{ color: 'var(--color-text-muted)' }}>
+                Belum daftar wajah? <a href="/face-enroll" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>Daftar di sini</a>
+              </p>
+            )}
           </div>
         ) : null}
+      </Modal>
+
+      {/* Face Verification Modal */}
+      <Modal isOpen={faceVerifyOpen} onClose={() => { setFaceVerifyOpen(false); setFaceResult(null); }} title="Verifikasi Wajah">
+        <div className="space-y-4">
+          {faceResult === 'success' ? (
+            <div className="flex flex-col items-center py-10 gap-3 animate-fade-in-up">
+              <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                <CheckCircle2 size={44} style={{ color: '#059669' }} />
+              </div>
+              <p className="text-lg font-bold" style={{ color: '#059669' }}>Wajah Terverifikasi ✓</p>
+              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Mengirim absensi...</p>
+            </div>
+          ) : faceResult === 'fail' ? (
+            <div className="flex flex-col items-center py-10 gap-3 animate-fade-in-up">
+              <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.1)' }}>
+                <XCircle size={44} style={{ color: '#DC2626' }} />
+              </div>
+              <p className="text-lg font-bold" style={{ color: '#DC2626' }}>Wajah Tidak Cocok</p>
+              {faceError && <p className="text-xs text-center" style={{ color: 'var(--color-text-muted)' }}>{faceError}</p>}
+            </div>
+          ) : faceVerifying ? (
+            <div className="flex flex-col items-center py-10 gap-3">
+              <div className="spinner" />
+              <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>Memverifikasi wajah...</p>
+            </div>
+          ) : (
+            <>
+              <div className="p-3 rounded-xl text-center" style={{ background: 'var(--color-surface-alt)' }}>
+                <ScanFace size={28} className="mx-auto mb-2" style={{ color: 'var(--color-primary)' }} />
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>Verifikasi identitas</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>Posisikan wajah — kamera akan otomatis memindai</p>
+              </div>
+
+              <WebcamCapture
+                onCapture={(file) => { if (file) handleFaceVerify(file); }}
+                guidanceText="Pastikan wajah terlihat jelas"
+                disabled={faceVerifying}
+                autoCapture
+                autoDelay={800}
+                key={`verify-${faceAttempts}`}
+              />
+            </>
+          )}
+        </div>
       </Modal>
     </div>
   );

@@ -45,8 +45,13 @@ export default function Users() {
   };
 
   const handleDelete = async (id, name) => {
-    if (!confirm(`Hapus user "${name}"?`)) return;
-    try { await api.delete(`/users/${id}`); fetchUsers(); } catch {}
+    if (!confirm(`Hapus user "${name}"? Semua data (absensi, logbook, dll) akan ikut terhapus.`)) return;
+    try {
+      await api.delete(`/users/${id}`);
+      fetchUsers();
+    } catch (err) {
+      alert('Gagal hapus user: ' + (err.response?.data?.error || err.message));
+    }
   };
 
   const roleConfig = {

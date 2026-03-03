@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Absen from './pages/intern/Absen';
 import Logbook from './pages/intern/Logbook';
 import Planner from './pages/intern/Planner';
+import FaceEnroll from './pages/intern/FaceEnroll';
 import Dashboard from './pages/mentor/Dashboard';
 import AttendanceView from './pages/mentor/AttendanceView';
 import AiChat from './pages/mentor/AiChat';
@@ -64,6 +65,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<HomeRedirect />} />
           <Route path="/absen" element={<ProtectedRoute roles={['INTERN']}><AppLayout><Absen /></AppLayout></ProtectedRoute>} />
+          <Route path="/face-enroll" element={<ProtectedRoute roles={['INTERN']}><AppLayout><FaceEnroll /></AppLayout></ProtectedRoute>} />
           <Route path="/logbook" element={<ProtectedRoute roles={['INTERN']}><AppLayout><Logbook /></AppLayout></ProtectedRoute>} />
           <Route path="/planner" element={<ProtectedRoute roles={['INTERN']}><AppLayout><Planner /></AppLayout></ProtectedRoute>} />
           <Route path="/mentor/dashboard" element={<ProtectedRoute roles={['MENTOR', 'SUPERUSER']}><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />

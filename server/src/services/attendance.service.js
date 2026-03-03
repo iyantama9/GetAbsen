@@ -4,8 +4,8 @@ const config = require('../config/env');
 
 async function submitAttendance(userId, data) {
   const { date, status, latitude, longitude, reason } = data;
-  const attendanceDate = new Date(date);
-  attendanceDate.setHours(0, 0, 0, 0);
+  // Store at UTC noon — can never flip to a different calendar day in any timezone
+  const attendanceDate = new Date(`${date}T12:00:00Z`);
 
   let distanceKm = null;
   const lat = latitude != null ? parseFloat(latitude) : null;
@@ -21,12 +21,12 @@ async function submitAttendance(userId, data) {
       date: attendanceDate,
       status,
       checkInTime: new Date(),
-      latitude,
-      longitude,
+      latitude: lat,
+      longitude: lng,
       distanceKm,
       reason,
     },
-    update: { status, checkInTime: new Date(), latitude, longitude, distanceKm, reason },
+    update: { status, checkInTime: new Date(), latitude: lat, longitude: lng, distanceKm, reason },
     include: { evidences: true },
   });
 }

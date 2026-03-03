@@ -44,4 +44,8 @@ module.exports = {
     baseUrl: process.env.AI_BASE_URL || 'https://router.getcore.id/v1',
     model: process.env.AI_MODEL || 'gemini-2.5-flash',
   },
+
+  faceService: {
+    baseUrl: process.env.FACE_SERVICE_URL || 'http://127.0.0.1:8001',
+  },
 };

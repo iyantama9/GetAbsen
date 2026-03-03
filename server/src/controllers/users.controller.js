@@ -68,7 +68,33 @@ async function update(req, res, next) {
 
 async function remove(req, res, next) {
   try {
-    await prisma.user.delete({ where: { id: req.params.id } });
+    const userId = req.params.id;
+
+    // Cascade delete related records
+    // Delete attendance evidences first (via attendance IDs)
+    const attendances = await prisma.attendance.findMany({ where: { userId }, select: { id: true } });
+    const attendanceIds = attendances.map(a => a.id);
+    if (attendanceIds.length > 0) {
+      await prisma.attendanceEvidence.deleteMany({ where: { attendanceId: { in: attendanceIds } } });
+      await prisma.externalSync.deleteMany({ where: { entityId: { in: attendanceIds } } });
+    }
+    await prisma.attendance.deleteMany({ where: { userId } });
+
+    // Delete logbook tasks (via entry IDs)
+    const entries = await prisma.logbookEntry.findMany({ where: { userId }, select: { id: true } });
+    const entryIds = entries.map(e => e.id);
+    if (entryIds.length > 0) {
+      await prisma.logbookTask.deleteMany({ where: { entryId: { in: entryIds } } });
+    }
+    await prisma.logbookEntry.deleteMany({ where: { userId } });
+
+    // Delete other related records
+    await prisma.plannerEvent.deleteMany({ where: { userId } });
+    await prisma.faceEmbedding.deleteMany({ where: { userId } });
+    await prisma.chatRoom.deleteMany({ where: { userId } });
+
+    // Finally delete the user
+    await prisma.user.delete({ where: { id: userId } });
     return success(res, { message: 'User deleted' });
   } catch (err) {
     next(err);

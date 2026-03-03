@@ -23,10 +23,13 @@ model User {
   interns      User[]   @relation("MentorInterns")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  attendances    Attendance[]
-  logbookEntries LogbookEntry[]
-  plannerEvents  PlannerEvent[]
-  chatRooms      ChatRoom[]
+  faceEnrolled         Boolean  @default(false) @map("face_enrolled")
+
+  attendances      Attendance[]
+  logbookEntries   LogbookEntry[]
+  plannerEvents    PlannerEvent[]
+  chatRooms        ChatRoom[]
+  faceEmbeddings   FaceEmbedding[]
 
   @@map("users")
 }
@@ -72,6 +75,18 @@ model AttendanceEvidence {
   createdAt    DateTime   @default(now()) @map("created_at")
 
   @@map("attendance_evidences")
+}
+
+model FaceEmbedding {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  embedding Float[]  // 512-dim vector from InsightFace
+  label     String?  // "front", "left", "right"
+  imageUrl  String?  @map("image_url")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("face_embeddings")
 }
 
 model LogbookEntry {

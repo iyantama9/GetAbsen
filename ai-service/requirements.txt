@@ -4,3 +4,4 @@ insightface
 numpy
 opencv-python
 onnxruntime
+python-multipart

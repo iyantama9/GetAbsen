@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ClipboardList, BookOpen, CalendarDays, LayoutDashboard, Users, Settings, Bot, LogOut, ChevronLeft, ChevronRight, Menu, X, BarChart3, Pencil, Camera } from 'lucide-react';
+import { ClipboardList, BookOpen, CalendarDays, LayoutDashboard, Users, Settings, Bot, LogOut, ChevronLeft, ChevronRight, Menu, X, BarChart3, Pencil, Camera, ScanFace } from 'lucide-react';
 import api from '../api/client';
 import Modal from './Modal';
 
@@ -9,6 +9,7 @@ const internLinks = [
   { to: '/absen', label: 'Absen', Icon: ClipboardList },
   { to: '/logbook', label: 'Logbook', Icon: BookOpen },
   { to: '/planner', label: 'Planner', Icon: CalendarDays },
+  { to: '/face-enroll', label: 'Face ID', Icon: ScanFace },
 ];
 
 const mentorLinks = [
