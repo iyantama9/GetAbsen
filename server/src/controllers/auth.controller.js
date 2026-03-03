@@ -13,14 +13,14 @@ async function login(req, res, next) {
 
     res.cookie('accessToken', result.accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
       sameSite: 'lax',
       maxAge: accessMaxAge,
     });
 
     res.cookie('refreshToken', result.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
       sameSite: 'lax',
       maxAge: refreshMaxAge,
     });
@@ -63,7 +63,7 @@ async function refresh(req, res, next) {
 
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
       sameSite: 'lax',
       maxAge: 15 * 60 * 1000,
     });
