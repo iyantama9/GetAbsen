@@ -57,7 +57,7 @@ function RoomSidebar({ rooms, activeRoom, onSelect, onCreate, onRename, onDelete
   const confirmEdit = () => { if (editName.trim()) { onRename(editingId, editName.trim()); } setEditingId(null); };
 
   return (
-    <div className="flex flex-col h-full border-r" style={{ borderColor: 'var(--color-border)', width: '240px', minWidth: '240px', background: 'var(--color-surface-alt)' }}>
+    <div className="flex flex-col h-full border-r" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-alt)' }}>
       <div className="p-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--color-border)' }}>
         <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Rooms</span>
         <button onClick={onCreate} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-purple-500/10 transition-colors cursor-pointer" style={{ color: 'var(--color-primary)' }}>
@@ -106,6 +106,7 @@ export default function AiChat() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [roomsLoaded, setRoomsLoaded] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const bottomRef = useRef(null);
 
   const greeting = { role: 'assistant', content: 'Halo! Saya **AI Assistant GetAbsen**, powered by **Gemini Flash** ⚡\n\nSaya bisa membantu kamu:\n- Memantau **progress intern**\n- Menganalisis **data absensi**\n- Memberikan **insight dan saran**\n\nTanya apa saja!' };
@@ -182,25 +183,36 @@ export default function AiChat() {
   if (!roomsLoaded) return <div className="flex items-center justify-center h-64"><div className="spinner" /></div>;
 
   return (
-    <div className="flex h-[calc(100vh-5rem)] lg:h-[calc(100vh-4rem)] animate-fade-in-up rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+    <div className="flex h-[calc(100vh-5rem)] lg:h-[calc(100vh-4rem)] animate-fade-in-up rounded-xl overflow-hidden relative" style={{ border: '1px solid var(--color-border)' }}>
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/30 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
       {/* Room sidebar */}
-      <RoomSidebar rooms={rooms} activeRoom={activeRoom} onSelect={setActiveRoom} onCreate={createRoom} onRename={renameRoom} onDelete={deleteRoom} />
+      <div className={`absolute md:relative z-40 h-full w-64 min-w-[16rem] transition-transform duration-200 md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`} style={{ maxWidth: '80vw' }}>
+        <RoomSidebar rooms={rooms} activeRoom={activeRoom} onSelect={(id) => { setActiveRoom(id); setSidebarOpen(false); }} onCreate={createRoom} onRename={renameRoom} onDelete={deleteRoom} />
+      </div>
 
       {/* Chat area */}
       <div className="flex flex-col flex-1 min-w-0" style={{ background: 'var(--color-bg)' }}>
         {/* Header */}
-        <div className="flex-shrink-0 px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--color-border)' }}>
-          <div>
-            <h1 className="text-base font-bold flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
-              <Bot size={18} style={{ color: 'var(--color-primary)' }} />
-              AI Assistant
-            </h1>
-            <p className="flex items-center gap-2 mt-0.5">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-full font-bold tracking-wide" style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>
-                <Sparkles size={10} /> GEMINI FLASH
-              </span>
-              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Powered by Getcore.ID</span>
-            </p>
+        <div className="flex-shrink-0 px-3 sm:px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--color-border)' }}>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="md:hidden w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer" style={{ color: 'var(--color-text-muted)' }}>
+              <MessageSquare size={18} />
+            </button>
+            <div>
+              <h1 className="text-sm sm:text-base font-bold flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
+                <Bot size={18} style={{ color: 'var(--color-primary)' }} />
+                AI Assistant
+              </h1>
+              <p className="flex items-center gap-2 mt-0.5">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-full font-bold tracking-wide" style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>
+                  <Sparkles size={10} /> GEMINI FLASH
+                </span>
+                <span className="text-xs hidden sm:inline" style={{ color: 'var(--color-text-muted)' }}>Powered by Getcore.ID</span>
+              </p>
+            </div>
           </div>
         </div>
 

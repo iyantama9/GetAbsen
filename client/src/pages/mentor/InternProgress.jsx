@@ -346,15 +346,15 @@ export default function InternProgress() {
           {/* Attendance Tab */}
           {activeTab === 'attendance' && (
             <div className="card">
-              <div className="table-container">
-                <table className="table">
+              <div className="table-container" style={{ overflowX: 'auto' }}>
+                <table className="table" style={{ minWidth: '600px' }}>
                   <thead>
                     <tr>
                       <th>Tanggal</th>
                       <th>Status</th>
-                      <th className="hidden sm:table-cell">Check-in</th>
-                      <th className="hidden md:table-cell">Jarak</th>
-                      <th className="hidden lg:table-cell">Alasan</th>
+                      <th>Check-in</th>
+                      <th>Jarak</th>
+                      <th>Alasan</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -369,11 +369,11 @@ export default function InternProgress() {
                             {a.status}
                           </span>
                         </td>
-                        <td className="hidden sm:table-cell">
+                        <td>
                           {a.checkInTime ? <span className="flex items-center gap-1"><Clock size={12} />{new Date(a.checkInTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span> : '-'}
                         </td>
-                        <td className="hidden md:table-cell">{a.distanceKm != null ? <span className="flex items-center gap-1"><MapPin size={12} />{a.distanceKm} km</span> : '-'}</td>
-                        <td className="hidden lg:table-cell">{a.reason || '-'}</td>
+                        <td>{a.distanceKm != null ? <span className="flex items-center gap-1"><MapPin size={12} />{a.distanceKm} km</span> : '-'}</td>
+                        <td>{a.reason || '-'}</td>
                       </tr>
                     ))}
                   </tbody>
