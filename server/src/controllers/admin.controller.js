@@ -52,6 +52,29 @@ async function closeDate(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function bulkReopenDates(req, res, next) {
+  try {
+    const { dates } = req.body;
+    if (!dates || !Array.isArray(dates)) return error(res, 'Dates array required', 400);
+    for (const date of dates) {
+      const key = `reopen_${date}`;
+      await prisma.appSetting.upsert({ where: { key }, create: { key, value: 'true' }, update: { value: 'true' } });
+    }
+    return success(res, { count: dates.length, reopened: true });
+  } catch (err) { next(err); }
+}
+
+async function bulkCloseDates(req, res, next) {
+  try {
+    const { dates } = req.body;
+    if (!dates || !Array.isArray(dates)) return error(res, 'Dates array required', 400);
+    for (const date of dates) {
+      await prisma.appSetting.deleteMany({ where: { key: `reopen_${date}` } });
+    }
+    return success(res, { count: dates.length, reopened: false });
+  } catch (err) { next(err); }
+}
+
 async function getReopenedDates(req, res, next) {
   try {
     const settings = await prisma.appSetting.findMany({ where: { key: { startsWith: 'reopen_' } } });
@@ -167,4 +190,4 @@ async function getChatHistory(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { getSettings, updateSettings, reopenDate, closeDate, getReopenedDates, getRooms, createRoom, updateRoom, deleteRoom, aiQuery, getChatHistory };
+module.exports = { getSettings, updateSettings, reopenDate, closeDate, bulkReopenDates, bulkCloseDates, getReopenedDates, getRooms, createRoom, updateRoom, deleteRoom, aiQuery, getChatHistory };

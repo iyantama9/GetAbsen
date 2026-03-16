@@ -14,6 +14,8 @@ router.put('/settings', authorize('SUPERUSER'), adminController.updateSettings);
 router.get('/attendance/reopened', authorize('INTERN', 'MENTOR', 'SUPERUSER'), adminController.getReopenedDates);
 router.post('/attendance/reopen', authorize('SUPERUSER'), adminController.reopenDate);
 router.delete('/attendance/reopen', authorize('SUPERUSER'), adminController.closeDate);
+router.post('/attendance/reopen-bulk', authorize('SUPERUSER'), adminController.bulkReopenDates);
+router.post('/attendance/close-bulk', authorize('SUPERUSER'), adminController.bulkCloseDates);
 
 // Chat rooms
 router.get('/mentor/chat-rooms', authorize('MENTOR', 'SUPERUSER'), adminController.getRooms);

@@ -11,7 +11,7 @@ export default function AttendanceView() {
   const [loading, setLoading] = useState(false);
   const [reopenedDates, setReopenedDates] = useState([]);
   const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    startDate: '2026-02-23',
     endDate: new Date().toISOString().split('T')[0],
   });
 
@@ -47,6 +47,26 @@ export default function AttendanceView() {
     } catch {}
   };
 
+  const handleBulkReopen = async () => {
+    const workdays = getWorkdays();
+    const closedDates = workdays.filter(d => !reopenedDates.includes(d));
+    if (closedDates.length === 0) return;
+    try {
+      await api.post('/admin/attendance/reopen-bulk', { dates: closedDates });
+      fetchReopenedDates();
+    } catch {}
+  };
+
+  const handleBulkClose = async () => {
+    const workdays = getWorkdays();
+    const openDates = workdays.filter(d => reopenedDates.includes(d));
+    if (openDates.length === 0) return;
+    try {
+      await api.post('/admin/attendance/close-bulk', { dates: openDates });
+      fetchReopenedDates();
+    } catch {}
+  };
+
   const isAdmin = user?.role === 'SUPERUSER';
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -60,7 +80,7 @@ export default function AttendanceView() {
       const dow = d.getDay();
       if (dow !== 0 && dow !== 6) {
         const ds = d.toISOString().split('T')[0];
-        if (ds < todayStr) days.push(ds);
+        if (ds <= todayStr) days.push(ds);
       }
       d.setDate(d.getDate() + 1);
     }
@@ -101,9 +121,25 @@ export default function AttendanceView() {
       {/* Reopen panel for admin */}
       {isAdmin && (
         <div className="card mb-5">
-          <div className="flex items-center gap-2 mb-3">
-            <Unlock size={14} style={{ color: 'var(--color-primary)' }} />
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Buka Kembali Absen</span>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Unlock size={14} style={{ color: 'var(--color-primary)' }} />
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Buka Kembali Absen</span>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={handleBulkReopen}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer hover:shadow-sm"
+                style={{ background: 'rgba(16,185,129,0.1)', borderColor: '#059669', color: '#059669' }}
+              >
+                <Unlock size={12} /> Buka Semua
+              </button>
+              <button onClick={handleBulkClose}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer hover:shadow-sm"
+                style={{ background: 'rgba(239,68,68,0.08)', borderColor: '#DC2626', color: '#DC2626' }}
+              >
+                <Lock size={12} /> Tutup Semua
+              </button>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {getWorkdays().map(ds => {
