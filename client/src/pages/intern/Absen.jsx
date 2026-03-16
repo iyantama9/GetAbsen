@@ -242,7 +242,9 @@ export default function Absen() {
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={() => setPageOffset(prev => prev + 1)}
+          disabled={workingDays.length > 0 && workingDays[0] <= ATTENDANCE_START}
           className="btn btn-ghost flex items-center gap-1 text-sm"
+          style={workingDays.length > 0 && workingDays[0] <= ATTENDANCE_START ? { opacity: 0.4, pointerEvents: 'none' } : {}}
         >
           <ChevronLeft size={16} /> Sebelumnya
         </button>
