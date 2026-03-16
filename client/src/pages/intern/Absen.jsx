@@ -37,13 +37,13 @@ export default function Absen() {
     getFaceStatus().then(res => setFaceEnrolled(res.data.data?.enrolled || false)).catch(() => setFaceEnrolled(false));
   }, []);
 
+  const ATTENDANCE_START = new Date(2026, 1, 23); // Feb 23, 2026
+
   const getWorkingDays = useCallback((offset = 0) => {
     const days = [];
     const today = new Date();
     const start = new Date(today);
-    // Move back by (offset * 12) working days from the base start
     start.setDate(today.getDate() - today.getDay() + 1 - 7);
-    // Additional offset for pagination
     let skipDays = offset * 12;
     let tempDate = new Date(start);
     while (skipDays > 0) {
@@ -53,15 +53,20 @@ export default function Absen() {
     }
     if (offset > 0) start.setTime(tempDate.getTime());
 
+    // Clamp start to ATTENDANCE_START
+    if (start < ATTENDANCE_START) start.setTime(ATTENDANCE_START.getTime());
+
     let count = 0;
     let d = new Date(start);
     while (count < 12) {
       const dow = d.getDay();
-      if (dow !== 0 && dow !== 6) {
+      if (dow !== 0 && dow !== 6 && d >= ATTENDANCE_START) {
         days.push(new Date(d));
         count++;
       }
       d.setDate(d.getDate() + 1);
+      // Stop if we go past today+7 to avoid infinite loop
+      if (d > new Date(today.getTime() + 7 * 86400000)) break;
     }
     return days;
   }, []);
